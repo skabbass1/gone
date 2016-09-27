@@ -145,17 +145,17 @@ class GoneLexer(Lexer):
     #
 
     # C-style comment (/* ... */)
-    @_(r'\/\*(.|\n)*\*\/')
+    @_(r'/\*(.|\n)*?\*/')
     def COMMENT(self, t):
         self.lineno += t.value.count('\n')
 
     # C++-style comment (//...)
-    @_(r'regex for a C plusplus style comment')
+    @_(r'//.*\n')
     def CPPCOMMENT(self, t):
         self.lineno += 1
 
     # Unterminated C-style comment. This is an error you should report
-    @_(r'regex for an unterminated comment')
+    @_(r'/\*(.|\n)*$')
     def COMMENT_UNTERM(self, t):
         error(self.lineno, "Unterminated comment")
 

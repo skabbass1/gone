@@ -73,6 +73,7 @@ empty    :
 To do the project, follow the instructions contained below.
 '''
 
+import sys
 # ----------------------------------------------------------------------
 # parsers are defined using SLY.  You inherit from the Parser class
 #
@@ -97,8 +98,10 @@ from .tokenizer import GoneLexer
 # Read instructions in ast.py
 from .ast import *
 
+
 class GoneParser(Parser):
     # Same token set as defined in the lexer
+    debugfile = 'parser.out'
     tokens = GoneLexer.tokens
 
     # ----------------------------------------------------------------------
@@ -106,6 +109,12 @@ class GoneParser(Parser):
     # precedence rules as in Python.  Instructions to be given in the project.
 
     precedence = (
+        # ('left', 'LOR'),
+        # ('left', 'LAND'),
+        # ('nonassoc', 'LT', 'LE', 'GT', 'GE', 'EQ', 'NE'),
+        # ('left', 'PLUS', 'MINUS'),
+        # ('left', 'TIMES', 'DIVIDE'),
+        ('right', 'UNARY'),
     )
 
     # ----------------------------------------------------------------------
@@ -153,12 +162,14 @@ class GoneParser(Parser):
     def statements(self, p):
         return Statements([p.statement])
 
-    @_('print_statement')
+    @_('print_statement',
+       'const_declaration',
+       'assign_statement',
+       'var_declaration',
+       'extern_declaration',
+       )
     def statement(self, p):
-        #import ipdb
-        #ipdb.set_trace()
         return p[0]
-
 
     @_('PRINT expression SEMI')
     def print_statement(self, p):
@@ -170,25 +181,122 @@ class GoneParser(Parser):
 
     @_('INTEGER')
     def literal(self, p):
-        return Literal(p.INTEGER, 'int')
+        return Literal(p.INTEGER, 'int', lineno=p.lineno)
 
     @_('FLOAT')
     def literal(self, p):
-        return Literal(p.FLOAT, 'float')
+        return Literal(p.FLOAT, 'float', lineno=p.lineno)
 
     @_('STRING')
     def literal(self, p):
-        return Literal(p.STRING, 'string')
+        return Literal(p.STRING, 'string', lineno=p.lineno)
+
+    @_('LPAREN expression RPAREN')
+    def expression(self, p):
+        return p.expression
 
     @_('expression PLUS expression',
        'expression MINUS expression',
        'expression TIMES expression',
        'expression DIVIDE expression')
     def expression(self, p):
-        return BinOp(p[1], p.expression0, p.expression1)
+        return BinOp(p[1], p.expression0, p.expression1, lineno=p.lineno)
+
+    @_('PLUS expression %prec UNARY',
+       'MINUS expression %prec UNARY')
+    def expression(self, p):
+        return Unaryop(p[0], p.expression, lineno=p.lineno)
+
+    @_('CONST ID ASSIGN expression SEMI')
+    def const_declaration(self, p):
+        return ConstDeclaration(p.ID, p.expression, lineno=p.lineno)
+
+    @_('VAR ID datatype SEMI')
+    def var_declaration(self, p):
+        return VarDeclaration(p.ID, p.datatype, None, lineno=p.lineno)
+
+    @_('VAR ID datatype ASSIGN expression SEMI')
+    def var_declaration(self, p):
+        return VarDeclaration(p.ID, p.datatype, p.expression, lineno=p.lineno)
+
+    @_('load_location')
+    def expression(self, p):
+        return p.load_location
+
+    @_('typename')
+    def datatype(self, p):
+        return p.typename
+
+    @_('typename LBRACKET expression RBRACKET')
+    def datatype(self, p):
+        return ArrayType(p.typename, p.expression, lineno=p.lineno)
+
+    @_('ID')
+    def typename(self, p):
+        return Typename(p.ID, lineno=p.lineno)
+
+    @_('ID')
+    def load_location(self, p):
+        return LoadVariable(p.ID, lineno=p.lineno)
+
+    @_('store_location ASSIGN expression SEMI')
+    def assign_statement(self, p):
+        return AssignmentStatement(p.store_location, p.expression, lineno=p.lineno)
+
+    @_('ID')
+    def store_location(self, p):
+        return StoreVariable(p.ID, lineno=p.lineno)
+
+    @_('ID LPAREN exprlist RPAREN')
+    def expression(self, p):
+        return FunctionCall(p.ID, p.exprlist, lineno=p.lineno)
+
+    @_('ID LPAREN RPAREN')
+    def expression(self, p):
+        return FunctionCall(p.ID, [], lineno=p.lineno)
+
+    @_('exprlist COMMA expression')
+    def exprlist(self, p):
+        p.exprlist.append(p.expression)
+        return p.exprlist
+
+    @_('expression')
+    def exprlist(self, p):
+        return [p.expression]
+
+    @_('EXTERN func_prototype SEMI')
+    def extern_declaration(self, p):
+        pass
+
+    @_('FUNC ID LPAREN parameters RPAREN datatype')
+    def func_prototype(self, p):
+        return FunctionPrototype(p.ID, p.parameters, p.datatype, lineno=p.lineno)
+
+    @_('FUNC ID LPAREN RPAREN datatype')
+    def func_prototype(self, p):
+        return FunctionPrototype(p.ID, [], p.datatype, lineno=p.lineno)
+
+    @_('parm_declaration')
+    def parameters(self, p):
+        return [p.parm_declaration]
+
+    @_('parameters COMMA parm_declaration')
+    def parameters(self, p):
+        p.parameters.append(p.parm_declaration)
+        return p.parameters
+
+    @_('ID datatype')
+    def parm_declaration(self, p):
+        return ParmDeclaration(p.ID, p.datatype, lineno=p.lineno)
+
+    @_('ID LBRACKET expression RBRACKET')
+    def store_location(self, p):
+        return StoreArray(p.ID, p.expression, lineno=p.lineno)
 
 
-
+    @_('ID LBRACKET expression RBRACKET')
+    def load_location(self, p):
+        return LoadArray(p.ID, p.expression, lineno=p.lineno)
 
     # ----------------------------------------------------------------------
     # DO NOT MODIFY
@@ -199,7 +307,8 @@ class GoneParser(Parser):
         if p:
             error(p.lineno, "Syntax error in input at token '%s'" % p.value)
         else:
-            error('EOF','Syntax error. No more input.')
+            error('EOF', 'Syntax error. No more input.')
+
 
 # ----------------------------------------------------------------------
 #                     DO NOT MODIFY ANYTHING BELOW HERE
@@ -216,6 +325,7 @@ def parse(source):
     ast = parser.parse(lexer.tokenize(source))
     return ast
 
+
 def main():
     '''
     Main program. Used for testing.
@@ -231,7 +341,8 @@ def main():
 
     # Output the resulting parse tree structure
     for depth, node in flatten(ast):
-        print('%s%s' % (' '*(4*depth), node))
+        print('%s%s' % (' ' * (4 * depth), node))
+
 
 if __name__ == '__main__':
     main()
