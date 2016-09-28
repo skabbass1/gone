@@ -266,11 +266,12 @@ class GoneParser(Parser):
 
     @_('EXTERN func_prototype SEMI')
     def extern_declaration(self, p):
-        pass
+        return ExternFunctionDeclaration(p.func_prototype, lineno=p.lineno)
 
     @_('FUNC ID LPAREN parameters RPAREN datatype')
     def func_prototype(self, p):
         return FunctionPrototype(p.ID, p.parameters, p.datatype, lineno=p.lineno)
+
 
     @_('FUNC ID LPAREN RPAREN datatype')
     def func_prototype(self, p):

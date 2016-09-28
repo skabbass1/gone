@@ -211,7 +211,6 @@ class CheckProgramVisitor(NodeVisitor):
         op = (node.op, node.expr.type)
         node.type = _supported_unaryops.get(op, error_type)
 
-
     def visit_BinOp(self, node):
         # 1. Make sure left and right operands have the same type
         # 2. Make sure the operation is supported
@@ -228,9 +227,7 @@ class CheckProgramVisitor(NodeVisitor):
 
         # check if operation is supported
         op = (node.left.type, node.op, node.right.type)
-        node.type = _supported_binops.get(op,error_type)
-
-
+        node.type = _supported_binops.get(op, error_type)
 
     def visit_AssignmentStatement(self, node):
         # 1. Make sure the location of the assignment is defined
@@ -318,6 +315,72 @@ class CheckProgramVisitor(NodeVisitor):
         # print('visit_Literal', node)
         node.type = self._symbol_table[node.typename]
         # You will need to add more methods here in Projects 5-8.
+
+
+    def visit_ParmDeclaration(self, node):
+        # 1. Visit the typename and propagate types
+        self.visit(node.typename)
+        node.type = node.typename.type
+
+
+    def visit_FunctionPrototype(self, node):
+        # 1. Make sure the function name is not already defined
+        # 2. Visit the parameters to make sure they contain valid types
+        # 3. Make sure the function return type is a valid type
+        # 4. Place the function prototype in the symbol table
+        for parm in node.parameters:
+            self.visit(parm)
+        self.visit(node.typename)
+        node.type = node.typename.type
+        self._symbol_table[node.name] = node
+
+
+    def visit_FunctionCall(self, node):
+        symnode = self._symbol_table.get(node.name, None)
+        if symnode:
+            if not isinstance(symnode, FunctionPrototype):
+                error(node.lineno, '%s not a function' % node.name)
+                node.type = error_type
+            else:
+                # A valid function prototype.  Check arguments and types
+                if len(node.arglist) != len(symnode.parameters):
+                    error(node.lineno,
+                          '%s expected %d arguments. Got %d.' % (node.name, len(symnode.parameters), len(node.arglist)))
+                for n, (arg, parm) in enumerate(zip(node.arglist, symnode.parameters), start=1):
+                    self.visit(arg)
+                    if arg.type != parm.type:
+                        error(arg.lineno, 'Type error. Argument %d must be %s' % (n, parm.type))
+                node.type = symnode.type
+        else:
+            error(node.lineno, 'Undefined name %s' % node.name)
+            node.type = error_type
+
+    # Function declaration
+    def visit_FunctionDeclaration(self, node):
+        # 1. Check to make sure not nested function
+        # 2. Visit prototype to check for duplication/typenames
+        # 3. Set up a new local scope
+        # 4. Process function parameters and add symbols to symbol table
+        # 5. Visit the body
+        # 6. Pop the local scope
+        import ipdb
+        ipdb.set_trace()
+        if self.current_function:
+            error(node.lineno, 'Nested functions not supported.')
+        else:
+            self.visit(node.prototype)
+            self._local_symtab = {}
+            self.current_function = node
+
+            # Process the function parameters
+            for parm in node.prototype.parameters:
+                self._symbol_table[parm.name] = parm
+
+            self.visit(node.statements)
+            self._local_symtab = None
+            self.current_function = None
+
+
 
 
 # ----------------------------------------------------------------------

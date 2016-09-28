@@ -157,6 +157,13 @@ class FunctionPrototype(AST):
     _fields = ['name', 'parameters', 'typename']
 
 
+class ExternFunctionDeclaration(AST):
+    '''
+    An external function declaration.   extern func foo(x int) int;
+    '''
+    _fields = ['prototype']
+
+
 class ArrayType(AST):
     '''
     An array datatype.  For example 'int [50]'

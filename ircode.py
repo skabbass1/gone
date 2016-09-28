@@ -201,16 +201,17 @@ from collections import defaultdict
 # the SSA code.   This is easy to do using dictionaries:
 
 binary_ops = {
-    '+' : 'add',
-    '-' : 'sub',
-    '*' : 'mul',
-    '/' : 'div',
+    '+': 'add',
+    '-': 'sub',
+    '*': 'mul',
+    '/': 'div',
 }
 
 unary_ops = {
-    '+' : 'uadd',
-    '-' : 'usub',
+    '+': 'uadd',
+    '-': 'usub',
 }
+
 
 # STEP 2: Implement the following Node Visitor class so that it creates
 # a sequence of SSA instructions in the form of tuples.  Use the
@@ -219,6 +220,7 @@ class GenerateCode(ast.NodeVisitor):
     '''
     Node visitor class that creates 3-address encoded instruction sequences.
     '''
+
     def __init__(self):
         super(GenerateCode, self).__init__()
 
@@ -232,13 +234,13 @@ class GenerateCode(ast.NodeVisitor):
         self.externs = []
 
     def new_temp(self, typeobj):
-         '''
-         Create a new temporary variable of a given type.
-         '''
-         typename = str(typeobj)
-         name = '__%s_%d' % (typename, self.versions[typename])
-         self.versions[typename] += 1
-         return name
+        '''
+        Create a new temporary variable of a given type.
+        '''
+        typename = str(typeobj)
+        name = '__%s_%d' % (typename, self.versions[typename])
+        self.versions[typename] += 1
+        return name
 
     # You must implement visit_Nodename methods for all of the other
     # AST nodes.  In your code, you will need to make instructions
@@ -254,7 +256,13 @@ class GenerateCode(ast.NodeVisitor):
         # Save the name of the temporary variable where the value was placed 
         node.gen_location = target
 
-    def visit_Binop(self, node):
+    def visit_LoadVariable(self, node):
+        target = self.new_temp(node.type)
+        inst = ('load_' + str(node.type), node.name, target)
+        self.code.append(inst)
+        node.gen_location = target
+
+    def visit_BinOp(self, node):
         self.visit(node.left)
         self.visit(node.right)
         target = self.new_temp(node.type)
@@ -263,10 +271,29 @@ class GenerateCode(ast.NodeVisitor):
         self.code.append(inst)
         node.gen_location = target
 
+    def visit_Unaryop(self, node):
+        self.visit(node.expr)
+        target = self.new_temp(node.type)
+        opcode = unary_ops[node.op] + '_' + str(node.expr.type)
+        inst = (opcode, node.expr.gen_location, target)
+        self.code.append(inst)
+        node.gen_location = target
+
+    def visit_FunctionCall(self, node):
+        args = []
+        for arg in node.arglist:
+            self.visit(arg)
+            args.append(arg.gen_location)
+        target = self.new_temp(node.type)
+        inst = ('call_func', node.name) + tuple(args) + (target,)
+        self.code.append(inst)
+        node.gen_location = target
+
     def visit_PrintStatement(self, node):
         self.visit(node.expr)
-        inst = ('print_' + str(node.expr.type) ,node.expr.gen_location)
+        inst = ('print_' + str(node.expr.type), node.expr.gen_location)
         self.code.append(inst)
+
 
 # Project 6 - Comparisons/Booleans
 # --------------------------------
@@ -310,9 +337,10 @@ def compile_ircode(source):
         gen.visit(ast)
 
         # !!!  This part will need to be changed slightly in Projects 7/8
-        return gen.code    
+        return gen.code
     else:
         return []
+
 
 def main():
     import sys
@@ -327,6 +355,7 @@ def main():
     # !!! This part will need to be changed slightly in Projects 7/8
     for instr in code:
         print(code)
+
 
 if __name__ == '__main__':
     main()
