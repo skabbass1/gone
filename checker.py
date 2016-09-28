@@ -173,7 +173,8 @@ fumble around a bit at first.
 
 from .errors import error
 from .ast import *
-from .typesys import check_binop, check_unaryop, builtin_types
+from .typesys import check_binop, check_unaryop, error_type, builtin_types, _supported_binops, _supported_unaryops
+
 
 class SymbolTable(object):
     '''
@@ -185,6 +186,7 @@ class SymbolTable(object):
     '''
     pass
 
+
 class CheckProgramVisitor(NodeVisitor):
     '''
     Program checking class.   This class uses the visitor pattern as described
@@ -192,63 +194,131 @@ class CheckProgramVisitor(NodeVisitor):
     for each kind of AST node that you want to process.  You may need to
     adjust the method names here if you've picked different AST node names.
     '''
+
     def __init__(self):
         # Initialize the symbol table
-        pass
+        self._symbol_table = {}
 
         # Add built-in type names to the symbol table
-        pass
+        self._symbol_table.update({t: t for t in builtin_types})
 
     def visit_Unaryop(self, node):
         # 1. Make sure that the operation is supported by the type
         # 2. Set the result type 
         #
         # Hint: Use the check_unaryop() function in typesys.py
-        pass
+        self.visit(node.expr)
+        op = (node.op, node.expr.type)
+        node.type = _supported_unaryops.get(op, error_type)
 
-    def visit_Binop(self, node):
+
+    def visit_BinOp(self, node):
         # 1. Make sure left and right operands have the same type
         # 2. Make sure the operation is supported
         # 3. Assign the result type
         #
         # Hint: Use the check_binop() function in typesys.py
-        pass
+        # print('visit_Binop:', node)
+
+        self.visit(node.left)
+        self.visit(node.right)
+        if node.left.type != node.right.type:
+            error(node.lineno, 'Type Error: Left and right operands do not have the same type')
+            node.type = error_type
+
+        # check if operation is supported
+        op = (node.left.type, node.op, node.right.type)
+        node.type = _supported_binops.get(op,error_type)
+
+
 
     def visit_AssignmentStatement(self, node):
         # 1. Make sure the location of the assignment is defined
         # 2. Visit the expression on the right hand side
         # 3. Check that the types match
-        pass
+        self.visit(node.store_location)
+        if node.expr:
+            self.visit(node.expr)
 
     def visit_ConstDeclaration(self, node):
         # 1. Check that the constant name is not already defined
         # 2. Add an entry to the symbol table
-        pass
+        # print('visit_ConstDeclaration', node)
+        sym = self._symbol_table.get(node.name, None)
+        if not sym:
+            self.visit(node.expr)
+            node.type = node.expr.type
+            self._symbol_table[node.name] = node
+        else:
+            error(node.lineno, 'Const Re-Declaration of %s' % (node.name))
 
     def visit_VarDeclaration(self, node):
         # 1. Check that the variable name is not already defined
         # 2. Add an entry to the symbol table
         # 3. Check that the type of the expression (if any) is the same
-        pass
-    
+        self.visit(node.typename)
+        node.type = node.typename.type
+        if node.expr:
+            self.visit(node.expr)
+            if (node.expr.type != node.type and
+                        node.expr.type != error_type):
+                error(node.lineno, 'Type error %s = %s' % (node.type, node.expr.type))
+        self._symbol_table[node.name] = node
+
     def visit_Typename(self, node):
         # 1. Make sure the typename is valid and that it's actually a type
-        pass
+
+        sym = self._symbol_table.get(node.name, None)
+        if sym:
+            if sym in builtin_types:
+                node.type = sym
+            else:
+                error(node.lineno, '%s is not a type' % node.name)
+                node.type = error_type
+        else:
+            error(node.lineno, '%s is not defined' % node.name)
+            node.type = error_type
 
     def visit_LoadVariable(self, node):
         # 1. Make sure the location is a valid variable or constant value
         # 2. Assign the type of the variable to the node
-        pass
+
+        sym = self._symbol_table.get(node.name, None)
+        if sym:
+            if isinstance(sym, (ConstDeclaration, VarDeclaration, ParmDeclaration)):
+                node.type = sym.type
+            else:
+                error(node.lineno, '%s not a valid location' % node.name)
+                node.type = error_type
+        else:
+            error(node.lineno, '%s undefined' % node.name)
+            node.type = error_type
+        # Attach the symbol to the node
+        node.sym = sym
 
     def visit_StoreVariable(self, node):
         # 1. Make sure the location can be assigned
         # 2. Assign the appropriate type
-        
+        sym = self._symbol_table.get(node.name)
+        if sym:
+            if isinstance(sym, (VarDeclaration, ParmDeclaration)):
+                node.type = sym.type
+            elif isinstance(sym, ConstDeclaration):
+                error(node.lineno, 'Type error. %s is constant' % node.name)
+                node.type = sym.type
+            else:
+                error(node.lineno, '%s not a valid location' % node.name)
+                node.type = error_type
+        else:
+            error(node.lineno, '%s undefined' % node.name)
+            node.type = error_type
+
     def visit_Literal(self, node):
         # 1. Attach an appropriate type to the literal
-        pass
+        # print('visit_Literal', node)
+        node.type = self._symbol_table[node.typename]
+        # You will need to add more methods here in Projects 5-8.
 
-    # You will need to add more methods here in Projects 5-8.
 
 # ----------------------------------------------------------------------
 #                       DO NOT MODIFY ANYTHING BELOW       
@@ -260,6 +330,7 @@ def check_program(ast):
     '''
     checker = CheckProgramVisitor()
     checker.visit(ast)
+
 
 def main():
     '''
@@ -275,8 +346,6 @@ def main():
     ast = parse(open(sys.argv[1]).read())
     check_program(ast)
 
+
 if __name__ == '__main__':
     main()
-
-
-

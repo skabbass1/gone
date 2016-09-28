@@ -22,36 +22,82 @@ Make helper functions as needed.  You may need to change this file
 later--ideally you don't want to change everything else when you do.
 '''
 
+# Bool type. Used in the checker for conditionals
+bool_type = 'bool'
+
+# Error type. Set in the checker on bad declarations, etc.
+error_type = None
+
 # List of builtin types.  These will get added to the symbol table
-builtin_types = [ 'int', 'float', 'string' ]
+builtin_types = ['int', 'float', 'string', 'bool']
 
 # Dict mapping all valid binary operations to a result type
-_supported_binops = {
-    # You define
-    }
 
-# Dict mapping all valid unary operations to result type
+_supported_binops = {
+    # Integer operations
+    ('int', '+', 'int'): 'int',
+    ('int', '-', 'int'): 'int',
+    ('int', '*', 'int'): 'int',
+    ('int', '/', 'int'): 'int',
+    ('int', '<', 'int'): 'bool',
+    ('int', '<=', 'int'): 'bool',
+    ('int', '>', 'int'): 'bool',
+    ('int', '>=', 'int'): 'bool',
+    ('int', '==', 'int'): 'bool',
+    ('int', '!=', 'int'): 'bool',
+
+    # Floating point operations
+    ('float', '+', 'float'): 'float',
+    ('float', '-', 'float'): 'float',
+    ('float', '*', 'float'): 'float',
+    ('float', '/', 'float'): 'float',
+    ('float', '<', 'float'): 'bool',
+    ('float', '<=', 'float'): 'bool',
+    ('float', '>', 'float'): 'bool',
+    ('float', '>=', 'float'): 'bool',
+    ('float', '==', 'float'): 'bool',
+    ('float', '!=', 'float'): 'bool',
+
+    # String operations
+    ('string', '+', 'string'): 'string',
+    ('string', '*', 'int'): 'string',
+    ('int', '*', 'string'): 'string',
+    ('string', '<', 'string'): 'bool',
+    ('string', '<=', 'string'): 'bool',
+    ('string', '>', 'string'): 'bool',
+    ('string', '>=', 'string'): 'bool',
+    ('string', '==', 'string'): 'bool',
+    ('string', '!=', 'string'): 'bool',
+
+    # Bool operations
+    ('bool', '==', 'bool'): 'bool',
+    ('bool', '!=', 'bool'): 'bool',
+    ('bool', '||', 'bool'): 'bool',
+    ('bool', '&&', 'bool'): 'bool',
+}  # Dict mapping all valid unary operations to result type
 _supported_unaryops = {
-    # You define
-    }
-    
+    # Integers
+    ('+', 'int'): 'int',
+    ('-', 'int'): 'int',
+
+    # Floats
+    ('+', 'float'): 'float',
+    ('-', 'float'): 'float',
+
+    # Bool
+    ('!', 'bool'): 'bool'
+}
+
+
 def check_binop(left_type, op, right_type):
     ''' 
     Check the validity of a binary operator. 
     '''
     # You define
 
+
 def check_unaryop(op, type):
     '''
     Check the validity of a unary operator. 
     '''
     # You define
-
-
-
-
-          
-
-
-
-
